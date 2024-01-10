@@ -9,6 +9,7 @@ import uuid
 
 from collections import defaultdict
 from datetime import timedelta
+from pathlib import Path
 
 import torch
 import torch.nn as nn
@@ -58,6 +59,8 @@ class Charts:
     global_step = 0
     SPS = 0
     learning_rate = 0
+    episodic_length = 0
+    episodic_return = 0
 
 def init(
         self: object = None,
@@ -83,6 +86,9 @@ def init(
 
     if exp_name is None:
         exp_name = str(uuid.uuid4())[:8]
+    exp_path = Path(f'current_exp').with_suffix('.txt')
+    with open(config.data_dir / exp_path, 'w') as file:
+        file.write(f"{exp_name}")
     wandb = None
     if track:
         import wandb
@@ -103,7 +109,7 @@ def init(
             num_envs=config.num_envs,
             envs_per_worker=config.envs_per_worker,
             envs_per_batch=config.envs_per_batch,
-            env_pool=config.env_pool,
+            #synchronous=config.synchronous,
         )
 
     obs_shape = pool.single_observation_space.shape
@@ -163,6 +169,12 @@ def init(
     values=torch.zeros(config.batch_size + 1).to(device)
     storage_profiler.stop()
 
+    # Original CleanRL charts for comparison
+    charts = Charts(
+        global_step=global_step,
+        learning_rate=config.learning_rate,
+    )
+
     #"charts/actions": wandb.Histogram(b_actions.cpu().numpy()),
     init_performance = pufferlib.namespace(
         init_time = time.time() - start_time,
@@ -183,7 +195,7 @@ def init(
         # Logging
         exp_name = exp_name,
         wandb = wandb,
-        learning_rate=config.learning_rate,
+        charts = charts,
         losses = Losses(),
         init_performance = init_performance,
         performance = Performance(),
@@ -213,15 +225,15 @@ def evaluate(data):
     # TODO: Handle update on resume
     if data.wandb is not None and data.performance.total_uptime > 0:
         data.wandb.log({
-            'SPS': data.SPS,
-            'global_step': data.global_step,
-            'learning_rate': data.learning_rate,
+            **{f'charts/{k}': v for k, v in data.charts.items()},
             **{f'losses/{k}': v for k, v in data.losses.items()},
             **{f'performance/{k}': v
                 for k, v in data.performance.items()},
             **{f'stats/{k}': v for k, v in data.stats.items()},
             **{f'skillrank/{policy}': elo
                 for policy, elo in data.policy_pool.ranker.ratings.items()},
+            'global_step': data.charts.global_step,
+            'agent_steps': data.charts.agent_steps,
         })
 
     data.policy_pool.update_policies()
@@ -294,11 +306,14 @@ def evaluate(data):
         with env_profiler:
             data.pool.send(actions.cpu().numpy())
 
+    data.global_step += config.batch_size
     eval_profiler.stop()
 
-    data.global_step += padded_steps_collected
-    data.reward = float(torch.mean(data.rewards))
-    data.SPS = int(padded_steps_collected / eval_profiler.elapsed)
+    charts = data.charts
+    charts.reward = float(torch.mean(data.rewards))
+    charts.agent_steps = data.global_step
+    charts.SPS = int(padded_steps_collected / eval_profiler.elapsed)
+    charts.global_step = data.global_step
 
     perf = data.performance
     perf.total_uptime = int(time.time() - data.start_time)
@@ -470,7 +485,8 @@ def train(data):
     var_y = np.var(y_true)
     explained_var = np.nan if var_y == 0 else 1 - np.var(y_true - y_pred) / var_y
 
-    data.learning_rate = data.optimizer.param_groups[0]["lr"]
+    charts = data.charts
+    charts.learning_rate = data.optimizer.param_groups[0]["lr"]
 
     losses = data.losses
     losses.policy_loss = np.mean(pg_losses)
@@ -539,7 +555,7 @@ def rollout(env_creator, env_kwargs, model_path, device='cuda', verbose=True):
         return_val += reward
 
         counts_map = env.env.counts_map
-        if np.sum(counts_map) > 0 and step % 500 == 0:
+        if env_kwargs['headless'] and np.sum(counts_map) > 0 and step % 1000 == 0:
             overlay = make_pokemon_red_overlay(bg, counts_map)
             cv2.imshow('Pokemon Red', overlay[1000:][::4, ::4])
             cv2.waitKey(1)
@@ -636,7 +652,7 @@ def make_pokemon_red_overlay(bg, counts):
 
     # Convert counts to hue map
     hsv = np.zeros((*counts.shape, 3))
-    hsv[..., 0] = scaled*(240.0/360.0)
+    hsv[..., 0] = (240.0 / 360) - scaled * (240.0 / 360.0) # scaled*(240.0/360.0)
     hsv[..., 1] = nonzero
     hsv[..., 2] = nonzero
 

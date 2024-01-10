@@ -22,13 +22,13 @@ class CleanPuffeRLSweep:
         'max': 1e-1,
     }
     batch_size = {
-        'values': [128, 256, 512, 1024, 2048],
+        'values': [8192, 16384, 32768, 65536],
     }
     batch_rows = {
-        'values': [16, 32, 64, 128, 256],
+        'values': [128, 256, 512, 1024],
     }
-    bptt_horizon = {
-        'values': [4, 8, 16, 32],
+    update_epochs = {
+        'values': [2, 4, 8, 16],
     }
 
 def make_sweep_config(method='random', name='sweep',
@@ -77,9 +77,13 @@ def all():
         'nmmo': nmmo,
         'open_spiel': open_spiel,
         'pokemon_red': pokegym,
+        'tetris': pokegym_test,
         'pokemon_red_pip': pokegym,
         'links_awaken': pokegym,
         'procgen': procgen,
+        'pokemon_test': pokegym_test,
+        'links_test': pokegym_test,
+
         #'smac': default,
         #'stable-retro': default,
     }
@@ -93,10 +97,10 @@ def classic_control():
 
 def nmmo():
     args = pufferlib.args.CleanPuffeRL(
-        num_envs=1,#64,
-        envs_per_batch=1,#=24,
+        num_envs=64,
+        envs_per_batch=24,
         envs_per_worker=1,
-        batch_size=2**12,#2**16,
+        batch_size=2**16,
         batch_rows=128,
     )
     return args, make_sweep_config()
@@ -118,13 +122,30 @@ def open_spiel():
 def pokegym():
     args = pufferlib.args.CleanPuffeRL(
         total_timesteps=100_000_000,
-        num_envs=4,
+        num_envs=96,
         envs_per_worker=1,
-        envpool_batch_size=4,
+        envpool_batch_size=32,
         update_epochs=3,
         gamma=0.998,
-        batch_size=2**10,
-        batch_rows=16,
+        batch_size=2**15,
+        batch_rows=128,
+    )
+    sweep_config = make_sweep_config(
+        metric=SweepMetric(name='stats/return'),
+        cleanrl=CleanPuffeRLSweep(),
+    )
+    return args, sweep_config
+
+def pokegym_test():
+    args = pufferlib.args.CleanPuffeRL(
+        total_timesteps=100_000_000,
+        num_envs=1,
+        envs_per_worker=1,
+        envpool_batch_size=1,
+        update_epochs=3,
+        gamma=0.998,
+        batch_size=2**15,
+        batch_rows=128,
     )
     return args, make_sweep_config()
 

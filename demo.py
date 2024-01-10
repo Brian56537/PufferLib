@@ -175,9 +175,9 @@ if __name__ == '__main__':
     parser.add_argument('--no-render', action='store_true', help='Disable render during evaluate')
     parser.add_argument('--exp-name', type=str, default=None, help="Resume from experiment")
     parser.add_argument('--vectorization', type=str, default='serial', help='Vectorization method (serial, multiprocessing, ray)')
-    parser.add_argument('--wandb-entity', type=str, default='jsuarez', help='WandB entity')
+    parser.add_argument('--wandb-entity', type=str, default='leanke', help='WandB entity')
     parser.add_argument('--wandb-project', type=str, default='pufferlib', help='WandB project')
-    parser.add_argument('--wandb-group', type=str, default='debug', help='WandB group')
+    parser.add_argument('--wandb-group', type=str, default='server', help='WandB group')
     parser.add_argument('--track', action='store_true', help='Track on WandB')
     parser.add_argument('--force-recurrence', action='store_true', help='Force model to be recurrent, regardless of defaults')
 
@@ -223,6 +223,7 @@ if __name__ == '__main__':
     elif args.track:
         args.exp_name = init_wandb(args, env_module)
 
+
     assert sum((args.train, args.sweep, args.evaluate is not None)) == 1, 'Must specify exactly one of --train, --sweep, or --evaluate'
     if args.train:
         train(args, env_module)
@@ -231,3 +232,4 @@ if __name__ == '__main__':
     else:
         rollout(env_module.make_env, args.env_kwargs,
             args.evaluate, device=args.args.device)
+
