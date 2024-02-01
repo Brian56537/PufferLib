@@ -2,7 +2,7 @@ from setuptools import find_packages, setup
 from Cython.Build import cythonize
 from itertools import chain
 
-VERSION = '0.5.0'
+VERSION = '0.6.1'
 
 # Default Gym/Gymnasium/PettingZoo versions
 # Gym:
@@ -15,7 +15,7 @@ VERSION = '0.5.0'
 # - 0.18-0.21 require setuptools<=65.5.0
 
 GYMNASIUM_VERSION = '0.29.1'
-GYM_VERSION = '0.21'
+GYM_VERSION = '0.23'
 PETTINGZOO_VERSION = '1.24.1'
 SHIMMY = 'shimmy[gym-v21]'
 
@@ -43,6 +43,9 @@ compatible_environments = {
     'box2d': [
         'swig==4.1.1',
         'gymnasium[box2d]',
+    ],
+    'bsuite': [
+        'bsuite==0.3.5',
     ],
     'butterfly': [
         'pettingzoo[butterfly]',
@@ -89,7 +92,9 @@ compatible_environments = {
         'pandas==2.0.2',
     ],
     'procgen': [
-        'procgen==0.10.7',
+        # Danijar mirrored for Python 3.11 and 3.12 support
+        'procgen-mirror==0.10.7',
+        #'procgen==0.10.7',
     ],
 }
 

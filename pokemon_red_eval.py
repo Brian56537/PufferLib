@@ -11,7 +11,7 @@ def make_pokemon_red_overlay(bg, counts):
 
     # Convert counts to hue map
     hsv = np.zeros((*counts.shape, 3))
-    hsv[..., 0] = (240.0 / 360) - scaled * (240.0 / 360.0) # scaled*(240.0/360.0)
+    hsv[..., 0] = 2*(1-scaled)/3
     hsv[..., 1] = nonzero
     hsv[..., 2] = nonzero
 
@@ -77,39 +77,87 @@ def rollout(env_creator, env_kwargs, agent_creator, agent_kwargs, model_path=Non
 
         step += 1
 
-def logger(values, log_path):
-    unique_pokemon = set()
-    unique_moves = set()
-    unique_items = set()
-    unique_env = set()
-    log_file = Path(f'log').with_suffix('.txt')
-    log_file_path = log_path / log_file
-    for pokemon_session in values:
-        for pokemon in pokemon_session:
-            unique_pokemon.add(pokemon['name'])
-            unique_moves.update(pokemon['moves'])
-            unique_items.update(pokemon['items'])
-    with open(log_file_path, 'w') as log:
-        log.write("============= Unique Pokemon =============\n")
-        for upokemon in sorted(unique_pokemon):
-            log.write(f"{upokemon}\n")
-        log.write("\n============== Unique Moves ==============\n")
-        for move in sorted(unique_moves):
-            log.write(f"{move}\n")
-        log.write("\n============== Unique Items ==============\n")
-        for item in sorted(unique_items):
-            log.write(f"{item}\n")
-        log.write("\n================== Log Entries ==================\n")
-        for pokemon_session in values:
-            env_id = (p for p in pokemon_session if p['env_id'] not in unique_env)
-            log.write(f"=============={pokemon['env_id']}==============\n")
-            for pokemon in pokemon_session:
-                if env_id and str(pokemon['level']) != str(0):
-                    log.write(f"  Slot: {pokemon['slot']}\n")
-                    log.write(f"  Name: {pokemon['name']}\n")
-                    log.write(f"  Level: {pokemon['level']}\n")
-                    log.write(f"  Moves: {', '.join(pokemon['moves'])}\n")
-                    log.write("  \n")  # Add a newline between Pokémon
-                unique_env.add(pokemon['env_id'])
 
-        
+def logger(pokemon_info, log_path):
+    for pokemon in pokemon_info:
+        for p in pokemon:
+            env_id = p['env_id']
+            log_file = Path(f"{env_id}").with_suffix('.txt')
+            log_file_path = log_path / log_file
+        with open(log_file_path, 'w') as log:
+            for p in pokemon:
+                if env_id and str(p['level']) != str(0):
+                    log.write(f"============= {p['env_id']} =============\n")
+                    log.write(f"Slot: {p['slot']}\n")
+                    log.write(f"Name: {p['name']}\n")
+                    log.write(f"Level: {p['level']}\n")
+                    log.write(f"Moves: {', '.join(p['moves'])}\n")
+                    log.write("\n============== Unique Items ==============\n")
+                    unique_items = set(p['items']) if 'items' in p else set()
+                    for item in sorted(unique_items):
+                        log.write(f"{item}\n")
+                        
+
+
+        # upokemon = set()
+        # umoves = set()
+        # uitems = set()
+        # count = 0
+        # agg_file = Path(f"log").with_suffix('.txt')
+        # agg_file_path = log_path / agg_file
+        # upokemon.add(p['name'])
+        # umoves.add(p['moves'])
+        # uitems.add(p['items'])
+        # if count >= 1:
+        #     with open(agg_file_path, 'w') as agg:
+        #         agg.write("============= Unique Pokemon =============\n")
+        #         for po in sorted(upokemon):
+        #             agg.write(f"{po}\n")
+        #         agg.write("\n============== Unique Moves ==============\n")
+        #         for m in sorted(umoves):
+        #             agg.write(f"{m}\n")
+        #         agg.write("\n============== Unique Items ==============\n")
+        #         for i in sorted(uitems):
+        #             agg.write(f"{i}\n")
+
+# def logger2(values, log_path):
+#     for pokemon_session in values:
+#         for pokemon in pokemon_session:
+#             log_file = Path(f"{pokemon['env_id']}").with_suffix('.txt')
+#             log_file_path = log_path / log_file
+#             with open(log_file_path, 'w') as log:
+
+# def logger(values, log_path):
+#     unique_pokemon = set()
+#     unique_moves = set()
+#     unique_items = set()
+#     unique_env = set()
+#     log_file = Path(f'log').with_suffix('.txt')
+#     log_file_path = log_path / log_file
+#     for pokemon_session in values:
+#         for pokemon in pokemon_session:
+#             unique_pokemon.add(pokemon['name'])
+#             unique_moves.update(pokemon['moves'])
+#             unique_items.update(pokemon['items'])
+#     with open(log_file_path, 'w') as log:
+#         log.write("============= Unique Pokemon =============\n")
+#         for upokemon in sorted(unique_pokemon):
+#             log.write(f"{upokemon}\n")
+#         log.write("\n============== Unique Moves ==============\n")
+#         for move in sorted(unique_moves):
+#             log.write(f"{move}\n")
+#         log.write("\n============== Unique Items ==============\n")
+#         for item in sorted(unique_items):
+#             log.write(f"{item}\n")
+#         log.write("\n================== Log Entries ==================\n")
+#         for pokemon_session in values:
+#             env_id = (p for p in pokemon_session if p['env_id'] not in unique_env)
+#             log.write(f"=============={pokemon['env_id']}==============\n")
+#             for pokemon in pokemon_session:
+#                 if env_id and str(pokemon['level']) != str(0):
+#                     log.write(f"  Slot: {pokemon['slot']}\n")
+#                     log.write(f"  Name: {pokemon['name']}\n")
+#                     log.write(f"  Level: {pokemon['level']}\n")
+#                     log.write(f"  Moves: {', '.join(pokemon['moves'])}\n")
+#                     log.write("  \n")  # Add a newline between Pokémon
+#                 unique_env.add(pokemon['env_id'])

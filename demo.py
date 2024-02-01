@@ -1,5 +1,6 @@
 from pdb import set_trace as T
 import argparse
+import shutil
 import sys
 import os
 
@@ -47,11 +48,11 @@ def make_policy(env, env_module, args):
 
     return policy.to(args.train.device)
 
-def init_wandb(args, env_module):
+def init_wandb(args, env_module, name=None, resume=True):
     #os.environ["WANDB_SILENT"] = "true"
 
     import wandb
-    wandb.init(
+    return wandb.init(
         id=args.exp_name or wandb.util.generate_id(),
         project=args.wandb_project,
         entity=args.wandb_entity,
@@ -62,12 +63,11 @@ def init_wandb(args, env_module):
             'policy': args.policy,
             'recurrent': args.recurrent,
         },
-        name=args.config,
+        name=name or args.config,
         monitor_gym=True,
         save_code=True,
-        resume=True,
+        resume=resume,
     )
-    return wandb.run.id
 
 def sweep(args, env_module, make_env):
     import wandb
@@ -76,6 +76,7 @@ def sweep(args, env_module, make_env):
     def main():
         try:
             args.exp_name = init_wandb(args, env_module)
+            exp_name = args.exp_name
             if hasattr(wandb.config, 'train'):
                 # TODO: Add update method to namespace
                 print(args.train.__dict__)
@@ -149,12 +150,13 @@ if __name__ == '__main__':
     parser.add_argument('--env', type=str, default=None, help='Name of specific environment to run')
     parser.add_argument('--mode', type=str, default='train', help='train/sweep/evaluate')
     parser.add_argument('--eval-model-path', type=str, default=None, help='Path to model to evaluate')
+    parser.add_argument('--baseline', action='store_true', help='Baseline run')
     parser.add_argument('--no-render', action='store_true', help='Disable render during evaluate')
     parser.add_argument('--exp-name', type=str, default=None, help="Resume from experiment")
     parser.add_argument('--vectorization', type=str, default='serial', help='Vectorization method (serial, multiprocessing, ray)')
     parser.add_argument('--wandb-entity', type=str, default='leanke', help='WandB entity')
     parser.add_argument('--wandb-project', type=str, default='pufferlib', help='WandB project')
-    parser.add_argument('--wandb-group', type=str, default='server', help='WandB group')
+    parser.add_argument('--wandb-group', type=str, default='server_0.7', help='WandB group')
     parser.add_argument('--track', action='store_true', help='Track on WandB')
     parser.add_argument('--force-recurrence', action='store_true', help='Force model to be recurrent, regardless of defaults')
 
@@ -169,8 +171,8 @@ if __name__ == '__main__':
         env_module = importlib.import_module(f'pufferlib.environments.{pkg}')
 
     # Get the make function for the environment
-    env_creator_args = [args['env_id']] if 'env_id' in args else []
-    make_env = env_module.env_creator(*env_creator_args)
+    env_name = args['env'] or config.env.pop('name')
+    make_env = env_module.env_creator(env_name)
 
     # Update config with environment defaults
     config.env = {**get_init_args(make_env), **config.env}
@@ -215,7 +217,19 @@ if __name__ == '__main__':
     if args.mode == 'sweep':
         args.track = True
     elif args.track:
-        args.exp_name = init_wandb(args, env_module)
+        args.exp_name = init_wandb(args, env_module).id
+    elif args.baseline:
+        args.track = True
+        args.exp_name = f'puf-{pufferlib.__version__}-{args.config}'
+        args.wandb_group = f'puf-{pufferlib.__version__}-baseline'
+        shutil.rmtree(f'experiments/{args.exp_name}', ignore_errors=True)
+        run = init_wandb(args, env_module, name=args.exp_name, resume=False)
+        if args.mode == 'evaluate':
+            model_name = f'puf-{pufferlib.__version__}-{args.config}_model:latest'
+            artifact = run.use_artifact(model_name)
+            data_dir = artifact.download()
+            model_file = max(os.listdir(data_dir))
+            args.eval_model_path = os.path.join(data_dir, model_file)
 
     if args.mode == 'train':
         train(args, env_module, make_env)

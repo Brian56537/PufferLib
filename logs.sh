@@ -2,40 +2,42 @@
 output_file="logs.txt"
 unique_names_file="unique_names.txt"
 unique_moves_file="unique_moves.txt"
-file_path="experiments/current_exp.txt"
-exp_path="experiments/$(<"$file_path")"
 
 format_log_entry() {
-  sed -n -e '/Slot:/,/^$/p' "$1" | sed 's/^/  /'
+  awk '/Slot:/,/^$/' "$1" | sed 's/^/  /'
 }
-find . -type d -name "session_*" -print0 | while IFS= read -r -d '' session_dir; do
-  find "$session_dir" -type f -name "*.txt" -print0 | while IFS= read -r -d '' log_file; do
-    format_log_entry "$log_file" | grep -o 'Name:.*' | sed 's/Name: //' >> "$unique_names_file"
-    format_log_entry "$log_file" | grep -o 'Moves:.*' | sed 's/Moves: //' | tr ',' '\n' | sed '/^$/d' | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*$//' >> "$unique_moves_file"
-  done
+
+# Find all .txt files in the current working directory
+find . -type f -name "*.txt" -print0 | while IFS= read -r -d '' log_file; do
+  # Extract unique names and moves
+  format_log_entry "$log_file" | grep -o 'Name:.*' | sed 's/Name: //' >> "$unique_names_file"
+  format_log_entry "$log_file" | grep -o 'Moves:.*' | sed 's/Moves: //' | tr ',' '\n' | sed '/^$/d' >> "$unique_moves_file"
 done
+
+# Sort and remove duplicates from unique names and moves
 sort -u "$unique_names_file" > "$unique_names_file.tmp"
 sort -u "$unique_moves_file" > "$unique_moves_file.tmp"
 mv "$unique_names_file.tmp" "$unique_names_file"
 mv "$unique_moves_file.tmp" "$unique_moves_file"
+
+# Create the output file
 {
   echo "============= Unique Pokemon ============="
   cat "$unique_names_file"
   echo
   echo "============== Unique Moves =============="
-  echo 
   cat "$unique_moves_file"
   echo
   echo "================== Log Entries =================="
 
-  find . -type d -name "session_*" -print0 | while IFS= read -r -d '' session_dir; do
-    echo "==============${session_dir}=============="
-    find "$session_dir" -type f -name "*.txt" -print0 | while IFS= read -r -d '' log_file; do
-      format_log_entry "$log_file"
-    done
+  # Process all .txt files in the current working directory
+  find . -type f -name "*.txt" -print0 | while IFS= read -r -d '' log_file; do
+    echo "==============${log_file}=============="
+    format_log_entry "$log_file"
   done
 } > "$output_file"
+
+# Clean up temporary files
 rm "$unique_names_file" "$unique_moves_file"
-mv "$output_file" "$exp_path"
 
 echo "Done..."
